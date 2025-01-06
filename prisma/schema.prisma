@@ -37,17 +37,15 @@ model Product {
   orderItems OrderItem[]
 }
 
-model OrderItem {
-  id String @id @default(uuid())
-  quantity Int
-  price Float
-  productId String
-  product Product @relation(fields: [productId], references: [id])
-  orderId String
-  order Order @relation(fields: [orderId], references: [id])
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
 
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 }
 
 enum PaymentStatus {
@@ -63,20 +61,17 @@ enum DeliveryStatus {
 }
 
 
-model Order{
-  id String @id @default(uuid())
-  paymentStatus PaymentStatus 
-  totalPrice Float
-  deliveryAddress String
-  deliveryStatus DeliveryStatus
-  paymentIntentId String
-   paymentDetails Json
-  user User @relation(fields: [userId], references: [id])
-  userId String
-  orderItems OrderItem[]
- 
-
-  
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+model Order {
+  id                String         @id @default(uuid())
+  user              User           @relation(fields: [userId], references: [id])
+  userId            String
+  orderItems        OrderItem[]
+  deliveryAddress   String
+  paymentIntentId   String
+  paymentDetails    Json
+  paymentStatus     PaymentStatus
+  totalPrice        Float
+  deliveryStatus    DeliveryStatus
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt()
 }

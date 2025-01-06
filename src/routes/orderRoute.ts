@@ -1,10 +1,10 @@
-import Elysia, { t } from "elysia";
+import Elysia, { error, t } from "elysia";
 import { authPlugin } from "../middleware/authPlugin";
 import { prisma } from "../models/db";
 import Stripe from "stripe";
 import { nanoid } from "nanoid";
 
-const stripeClient = new Stripe(Bun.env.STRIPE_SECRET_KEY as string, {
+const stripe = new Stripe(Bun.env.STRIPE_SECRET_KEY as string, {
   apiVersion: "2024-12-18.acacia",
 });
 
@@ -14,58 +14,48 @@ export const orderRouter = new Elysia({ prefix: "/orders" })
     "/",
     async ({ user, body }) => {
       try {
-        console.log("Body received:", body);
-  
         const { orderItems, deliveryAddress, totalPrice } = body;
-        const orderId = "order_" + nanoid();
-  
-        const paymentIntent = await stripeClient.paymentIntents.create({
-          amount: totalPrice * 100,
+
+        // 1. Validate `orderItems` length
+        if (!orderItems || !orderItems.length) {
+          return error(400, "No order items found");
+        }
+
+        // 2. Create PaymentIntent
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Math.floor(totalPrice * 100), // Stripe accepts cents
           currency: "inr",
         });
-  
+
+        // 3. Create Order with Items
+        const orderId = `order_${nanoid()}`;
         const order = await prisma.order.create({
           data: {
-            user: {
-              connect: {
-                id: user.id,
-              },
-            },
             id: orderId,
+            user: { connect: { id: user.id } },
             deliveryAddress,
-            deliveryStatus: "PENDING",
             totalPrice,
-            paymentDetails: {
-              amount: paymentIntent.amount,
-            },
+            deliveryStatus: "PENDING",
             paymentIntentId: paymentIntent.id,
             paymentStatus: "PENDING",
+            paymentDetails: { amount: paymentIntent.amount },
           },
         });
-  
-        console.log("Order created:", order);
-  
-        // Replacing createMany with a loop
-        for (const orderItem of orderItems) {
-          await prisma.orderItem.create({
-            data: {
-              orderId,
-              productId: orderItem.productId,
-              quantity: orderItem.quantity,
-              price: orderItem.price,
-            },
-          });
-        }
-  
-        return {
-          order,
-          clientSecret: paymentIntent.client_secret,
-        };
+
+        // 4. Bulk Insert OrderItems
+        await prisma.orderItem.createMany({
+          data: orderItems.map(({ productId, quantity, price }) => ({
+            orderId,
+            productId,
+            quantity,
+            price,
+          })),
+        });
+
+        return { order, clientSecret: paymentIntent.client_secret };
       } catch (error) {
-        console.error("Error processing order:", error);
-        return {
-          error: error.message || "An unexpected error occurred",
-        };
+        console.error("Order creation error:", error);
+        return error(500, "Internal server error while creating order");
       }
     },
     {
@@ -73,21 +63,20 @@ export const orderRouter = new Elysia({ prefix: "/orders" })
         deliveryAddress: t.String(),
         totalPrice: t.Number(),
         orderItems: t.Array(
-          t.Object({
-            productId: t.String(),
-            quantity: t.Number(),
-            price: t.Number(),
-          })
+          t.Object({ productId: t.String(), quantity: t.Number(), price: t.Number() })
         ),
       }),
     }
   )
-  
+
   .get("/", async ({ user }) => {
-    const orders = await prisma.order.findMany({
-      where: {
-        userId: user.id,
-      },
-    });
-    return orders;
+    try {
+      const orders = await prisma.order.findMany({
+        where: { userId: user.id },
+        include: { orderItems: true },
+      });
+      return orders;
+    } catch (e) {
+      return error(500, "Failed to fetch orders");
+    }
   });
