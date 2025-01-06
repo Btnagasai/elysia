@@ -1,167 +1,100 @@
 import Elysia, { error, InternalServerError, t } from "elysia";
 import { prisma } from "../models/db";
 
-export const userRouter = new Elysia({prefix: "/users"})
-.get("/list", async({}) => {
-  try{
-    const user = await prisma.user.findMany({});
-  return user;
-  } catch (error) {
-    console.error(500, InternalServerError);
-  }
-})
-.post ("/create", async({body}) => {
-    try {
-      const {name, email, password, image} = body;
-      const hashedPassword = await Bun.password.hash(password);
-      const newUser = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          image
-        },
-      });
-      return newUser;
-    } catch  {
-      return error(500, "Internal Server Error");
+export const userRouter = new Elysia({ prefix: "/users" })
+  .get ("/list", async ({}) => {
+    try{
+        const users = await prisma.user.findMany({});
+        return users;
+        } catch (e) {
+            return error(500, InternalServerError);
+
     }
-}, {
-  body: t.Object({
-    name: t.String(),
-    email: t.String(),
-    password: t.String(),
-    image: t.String(),
-  }),
-})
+  })
+  .post(
+    "/create",
+    async ({ body }) => {
+      try {
+        const { name, image, email, password } = body;
+        const hashedPassword = await Bun.password.hash(password);
+        const newuser = await prisma.user.create({
+          data: {
+            name,
+            image,
+            email,
+            password: hashedPassword,
+            
+          },
+        });
 
+        return newuser;
+      } catch (e) {
+        return error(500, "Internal Server Error");
+      }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        image: t.String(),
+        email: t.String(),
+        password: t.String(),
+      }),
+    }
+  )
 
+  .delete(
+    "/:id",
+    async ({ params}) => {
+      try {
+        const { id } = params;
+        const deletedUser = await prisma.user.delete({
+          where: {
+           id,
+          },
+        });
 
+        return deletedUser;
+      } catch (e) {
+        return error(500, "Internal Server Error");
+      }
+    },
+    {
+        params: t.Object({
+            id: t.String(),
+        })
+    }
+  )
+  .put(
+    "/:id",
+    async ({ body, params }) => {
+      try {
+        const {id} = params
+        const { name} = body;
+        const newuser = await prisma.user.update({
+          where: {
+            id,
+          },
+          data: {
+            name,
+          },
+        });
 
+        return newuser;
+      } catch (e) {
+        return error(500, "Internal Server Error");
+      }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+       
+      }),
+      params: t.Object({
+        id:t.String()
 
+      }),
+    } )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// import Elysia, { error, t } from "elysia";
-// import { prisma } from "../models/db";
-
-
-// export const userRouter = new Elysia({ prefix: "/user" })
-//   .get("/list", async () => {
-//     try {
-//       const users = await prisma.user.findMany();
-//       return { users };
-//     } catch (e) {
-//       return error(500, "Internal Server Error");
-//     }
-//   })
-//   .post(
-//     "/create",
-//     async ({ body }) => {
-//       try {
-//         const { email, image, name, password } = body;
-//         const hashedPassword = await Bun.password.hash(password);
-
-//         const newUser = await prisma.user.create({
-//           data: {
-//             email,
-//             image,
-//             name,
-//             password: hashedPassword,
-//           },
-//         });
-
-//         return newUser;
-//       } catch (e) {
-//         return error(500, "Internal Server Error");
-//       }
-//     },
-//     {
-//       body: t.Object({
-//         name: t.String({ minLength: 1 }),
-//         email: t.String({ minLength: 1 }),
-//         image: t.String({ minLength: 1 }),
-//         password: t.String({ minLength: 1 }),
-//       }),
-//     }
-//   )
-//   .delete("/:id", async ({ params }) => {
-//     try {
-//       const { id } = params;
-//       const deleteUser = await prisma.user.delete({
-//         where: {
-//           id: id,
-//         }
-//       });
-//       return deleteUser;
-//     } catch (e) {
-//       return error(500, "Internal Server Error");
-//     }
-//   }, {
-//     params: t.Object({
-//       id: t.String({ minLength: 1, }),
-//     }),
-//   })
-
-
-//   .put(
-//     "/:id",
-//     async ({ params, body }) => {
-//       try {
-//         const { id } = params;
-//         const { name } = body;
-
-//         const updatedUser = await prisma.user.update({
-//           where: {
-//             id,
-//           },
-//           data: {
-//             name,
-//           },
-//         });
-
-//         return { name: updatedUser.name };
-//       } catch (e) {
-//         return error(500, "Internal Server Error");
-//       }
-//     },
-//     {
-//       params: t.Object({
-//         id: t.String({
-//           minLength: 1,
-//         }),
-//       }),
-//       body: t.Object({
-//         name: t.String({
-//           minLength: 1,
-//         }),
-//       }),
-//     }
-//   )
-//   .get("/profile", async () => {
-//     return { message: "user profile" };
-//   });
-
-// export default userRouter;
-
-
-
-
-
-
-
-
+  .get("/profile", async ({}) => {
+    return "user profile";
+  });

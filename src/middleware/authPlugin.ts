@@ -2,34 +2,48 @@ import jwt from '@elysiajs/jwt';
 import Elysia, { error } from 'elysia';
 import { prisma } from '../models/db';
 
+
 export const authPlugin = (app: Elysia) =>
-    app
-        .use(
-            jwt({
-                secret: Bun.env.JWT_TOKEN as string, // JWT secret
-            })
-        )
-        .derive(async ({ jwt, headers }) => {
-            const authorization = headers.authorization;
+  app
+    .use(
+      jwt({
+        secret: Bun.env.JWT_TOKEN as string, // Environment variable for JWT secret
+      })
+    )
+    .derive(async ({ jwt, headers }) => {
+      const authorization = headers.authorization;
 
-            if (!authorization?.startsWith('Bearer ')) {
-                return error(401, 'Authorization header invalid');
-            }
+      // Validate Authorization Header
+      if (!authorization?.startsWith('Bearer')) {
+        return error(401, 'Unauthorized');
+      }
 
-            const token = authorization.slice(7);
-            const payload = await jwt.verify(token).catch(() => null);
+      // Extract and verify the token
+      const token = authorization.slice(7);
+      const payload = await jwt.verify(token);
 
-            if (!payload?.sub) {
-                return error(401, 'Token verification failed');
-            }
+      if (!payload) {
+        return error(401, 'Unauthorized');
+      }
 
-            const user = await prisma.user.findUnique({
-                where: { id: payload.sub as string },
-            });
+      // Fetch user from the database using the token's payload
+      const user = await prisma.user.findUnique({
+        where: {
+          id: payload.sub as string, // Use 'sub' (subject) from token
+        },
+      });
 
-            if (!user) {
-                return error(401, 'User not found');
-            }
+      if (!user) {
+        return error(401, 'Unauthorized');
+      }
 
-            return { user };
-        });
+      // Attach the user details, including the id, for later use
+      return {
+        user: {
+          id: user.id, // Include id
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        },
+      };
+    });
