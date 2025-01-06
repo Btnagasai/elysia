@@ -13,49 +13,60 @@ export const orderRouter = new Elysia({ prefix: "/orders" })
   .post(
     "/",
     async ({ user, body }) => {
-      console.log(body);
-      console.log("logging body");
-      const { orderItems, deliveryAddress, totalPrice } = body;
-      const orderId = "order_" + nanoid();
-      const paymentIntent = await stripeClient.paymentIntents.create({
-        amount: totalPrice * 100,
-        currency: "inr",
-      });
-
-      const order = await prisma.order.create({
-        data: {
-          user: {
-            connect: {
-              id: user.id,
+      try {
+        console.log("Body received:", body);
+  
+        const { orderItems, deliveryAddress, totalPrice } = body;
+        const orderId = "order_" + nanoid();
+  
+        const paymentIntent = await stripeClient.paymentIntents.create({
+          amount: totalPrice * 100,
+          currency: "inr",
+        });
+  
+        const order = await prisma.order.create({
+          data: {
+            user: {
+              connect: {
+                id: user.id,
+              },
             },
+            id: orderId,
+            deliveryAddress,
+            deliveryStatus: "PENDING",
+            totalPrice,
+            paymentDetails: {
+              amount: paymentIntent.amount,
+            },
+            paymentIntentId: paymentIntent.id,
+            paymentStatus: "PENDING",
           },
-          id: orderId,
-          deliveryAddress,
-          deliveryStatus: "PENDING",
-          totalPrice: totalPrice,
-          paymentDetails: {
-            amount: paymentIntent.amount,
-          },
-          paymentIntentId: paymentIntent.id,
-          paymentStatus: "PENDING",
-        },
-      });
-      console.log(order);
-      const __orderItems = await prisma.orderItem.createMany({
-        data: orderItems.map((orderItem) => {
-          return {
-            orderId,
-            productId: orderItem.productId,
-            quantity: orderItem.quantity,
-            price: orderItem.price,
-          };
-        }),
-      });
-
-      return {
-        order,
-        clientSecret: paymentIntent.client_secret,
-      };
+        });
+  
+        console.log("Order created:", order);
+  
+        // Replacing createMany with a loop
+        for (const orderItem of orderItems) {
+          await prisma.orderItem.create({
+            data: {
+              orderId,
+              productId: orderItem.productId,
+              quantity: orderItem.quantity,
+              price: orderItem.price,
+            },
+          });
+        }
+  
+        return {
+          order,
+          clientSecret: paymentIntent.client_secret,
+        };
+      } catch (error) {
+        console.error("Error processing order:", error);
+        return {
+          error: error.message || "An unexpected error occurred",
+        };
+      }
     },
     {
       body: t.Object({
@@ -71,6 +82,7 @@ export const orderRouter = new Elysia({ prefix: "/orders" })
       }),
     }
   )
+  
   .get("/", async ({ user }) => {
     const orders = await prisma.order.findMany({
       where: {
