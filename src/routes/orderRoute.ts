@@ -1,12 +1,11 @@
 import Elysia, { t } from "elysia";
 import { authPlugin } from "../middleware/authPlugin";
 import { prisma } from "../models/db";
-
-import { nanoid } from "nanoid";
 import Stripe from "stripe";
+import { nanoid } from "nanoid";
 
 const stripeClient = new Stripe(Bun.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: "2024-11-20.acacia",
+  apiVersion: "2024-12-18.acacia",
 });
 
 export const orderRouter = new Elysia({ prefix: "/orders" })
@@ -41,6 +40,7 @@ export const orderRouter = new Elysia({ prefix: "/orders" })
           paymentStatus: "PENDING",
         },
       });
+      console.log(order);
       const __orderItems = await prisma.orderItem.createMany({
         data: orderItems.map((orderItem) => {
           return {
